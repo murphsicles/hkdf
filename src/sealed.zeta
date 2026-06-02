@@ -1,0 +1,61 @@
+// Auto-converted from /tmp/df-hkdf-0.12.4/hkdf-0.12.4/src/sealed.rs
+
+use hmac::digest::{ block_buffer::Eager, core_api::{ BlockSizeUser, BufferKindUser, CoreProxy, CoreWrapper, FixedOutputCore, OutputSizeUser, UpdateCore }, generic_array::typenum::{ IsLess, Le, NonZero, U256 }, Digest, FixedOutput, HashMarker, KeyInit, Output, Update };
+use hmac::{ Hmac, HmacCore, SimpleHmac };
+pub trait Sealed<H: OutputSizeUser> {
+ type Core;
+ fn new_from_slice(key: &[u8]) -> Self;
+ fn new_core(key: &[u8]) -> Self::Core;
+ fn from_core(core: &Self::Core) -> Self;
+ fn update(&mut self, data: &[u8]);
+ fn finalize(self) -> Output<H>
+}
+
+impl<H> Sealed<H> for Hmac<H> where H: CoreProxy + OutputSizeUser, H::Core: HashMarker + UpdateCore + FixedOutputCore + BufferKindUser<_> + Default + Clone, BlockSizeUser::BlockSize: IsLess<U256>, Le<BlockSizeUser::BlockSize, U256>: NonZero {
+ type Core = HmacCore<H>;
+ fn new_from_slice(key: &[u8]) -> Self {
+ KeyInit::new_from_slice(key).expect("HMAC can take a key of any size")
+ }
+ 
+ fn new_core(key: &[u8]) -> Self::Core {
+ HmacCore::new_from_slice(key).expect("HMAC can take a key of any size")
+ }
+ 
+ fn from_core(core: &Self::Core) -> Self {
+ CoreWrapper::from_core(core.clone())
+ }
+ 
+ fn update(&mut self, data: &[u8]) {
+ Update::update(self, data);
+ }
+ 
+ fn finalize(self) -> Output<H> {
+ Output::<H>::clone_from_slice(&self.finalize_fixed())
+ }
+ 
+}
+
+impl<H: Digest + BlockSizeUser + Clone> Sealed<H> for SimpleHmac<H> {
+ type Core = Self;
+ fn new_from_slice(key: &[u8]) -> Self {
+ KeyInit::new_from_slice(key).expect("HMAC can take a key of any size")
+ }
+ 
+ fn new_core(key: &[u8]) -> Self::Core {
+ KeyInit::new_from_slice(key).expect("HMAC can take a key of any size")
+ }
+ 
+ fn from_core(core: &Self::Core) -> Self {
+ core.clone()
+ }
+ 
+ fn update(&mut self, data: &[u8]) {
+ Update::update(self, data);
+ }
+ 
+ fn finalize(self) -> Output<H> {
+ Output::<H>::clone_from_slice(&self.finalize_fixed())
+ }
+ 
+}
+
